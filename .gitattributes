@@ -1,0 +1,22 @@
+# Delphi/Object Pascal dosyaları için GitHub language detection
+*.pas linguist-language=Pascal
+*.dpr linguist-language=Pascal
+*.dfm linguist-language=Pascal
+*.inc linguist-language=Pascal
+*.pp linguist-language=Pascal
+
+# Delphi proje dosyaları
+*.dproj linguist-detectable=false
+*.dproj.local linguist-detectable=false
+*.identcache linguist-detectable=false
+*.local linguist-detectable=false
+*.dcu linguist-detectable=false
+*.exe linguist-detectable=false
+*.res linguist-detectable=false
+
+# Dokümantasyon dosyaları
+*.md linguist-detectable=true
+*.txt linguist-detectable=false
+
+# Bu bir Delphi projesidir
+# GitHub bu projeyi "Delphi" olarak tanımlasın
