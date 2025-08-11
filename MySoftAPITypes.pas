@@ -5,6 +5,13 @@ interface
 uses
   System.SysUtils, System.Classes;
 
+const
+  { MySoft Delphi API Sürüm Bilgileri }
+  MYSOFT_DELPHI_API_VERSION = '1.0.0';
+  MYSOFT_DELPHI_API_NAME = 'MySoft E-Fatura/E-İrsaliye Delphi API';
+  MYSOFT_DELPHI_API_AUTHOR = 'Mert Bilişim - info@mertbilisim.com.tr';
+  MYSOFT_DELPHI_API_DATE = '2025-01-12';
+
 type
   { MySoft API için ortak tipler ve kayıt yapıları }
   

@@ -61,7 +61,7 @@ begin
   FGelenFaturaAPI := TMySoftGelenFaturaAPI.Create;
   
   // Form ayarları
-  Caption := 'E-Fatura Delphi Örnek Proje';
+  Caption := MYSOFT_DELPHI_API_NAME + ' v' + MYSOFT_DELPHI_API_VERSION;
   Font.Name := 'Segoe UI';
   Font.Charset := TURKISH_CHARSET;
   

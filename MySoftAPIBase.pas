@@ -42,7 +42,7 @@ begin
   Result := THTTPClient.Create;
   Result.ConnectionTimeout := 30000; // 30 saniye
   Result.ResponseTimeout := 30000;
-  Result.UserAgent := 'Delphi-EFatura-Client/2.0-Modular';
+  Result.UserAgent := 'MySoft-Delphi-API/' + MYSOFT_DELPHI_API_VERSION;
 end;
 
 function TMySoftAPIBase.BuildTokenRequest(const Username, Password: string): string;

@@ -1,5 +1,6 @@
 # 🏢 EFaturaDelphi - MySoft API Entegrasyon Projesi
 
+[![Version](https://img.shields.io/badge/Version-v1.0.0-brightgreen.svg)](https://github.com/mukerremmert/MySoftDelphi/releases/tag/v1.0.0)
 [![Delphi](https://img.shields.io/badge/Delphi-10.3%20Rio+-red.svg)](https://www.embarcadero.com/products/delphi)
 [![Platform](https://img.shields.io/badge/Platform-Windows-blue.svg)](https://www.microsoft.com/windows)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
