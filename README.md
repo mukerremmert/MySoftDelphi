@@ -1,6 +1,6 @@
 # 🏢 EFaturaDelphi - MySoft API Entegrasyon Projesi
 
-[![Version](https://img.shields.io/badge/Version-v1.1.0-brightgreen.svg)](https://github.com/mukerremmert/MySoftDelphi/releases/tag/v1.1.0)
+[![Version](https://img.shields.io/badge/Version-v1.2.0-brightgreen.svg)](https://github.com/mukerremmert/MySoftDelphi/releases/tag/v1.2.0)
 [![Delphi](https://img.shields.io/badge/Delphi-10.3%20Rio+-red.svg)](https://www.embarcadero.com/products/delphi)
 [![Platform](https://img.shields.io/badge/Platform-Windows-blue.svg)](https://www.microsoft.com/windows)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
@@ -24,6 +24,7 @@
 ### ✅ **Mevcut Özellikler**
 - 🔐 **MySoft API Token Yönetimi** (Otomatik yenileme)
 - 📊 **Gelen Fatura Listesi Sorgulama** (18 sütunlu detaylı görünüm)
+- 📤 **Giden Fatura Listesi Sorgulama** (15 sütunlu detaylı görünüm)
 - 📦 **Gelen İrsaliye Listesi Sorgulama** (12 sütunlu detaylı görünüm)
 - ⚙️ **Firma Ayarları Yönetimi** (VKN/TCKN doğrulama)
 - 🔒 **Güvenli API İletişimi** (HTTPS + JSON)
@@ -31,9 +32,10 @@
 - 💾 **Ayar Kaydetme/Yükleme** (INI dosyası)
 - 🌍 **Türkçe Karakter Desteği**
 - 🛠️ **Modüler Mimari** (Ayrı API sınıfları)
+- 🔧 **TInvoiceBuilder** (Fatura oluşturma helper sınıfı)
 
 ### 🔄 **Planlanacak Özellikler**
-- 📤 **Giden Fatura Gönderimi**
+- 📝 **Fatura Oluşturma/Gönderimi** (TInvoiceBuilder ile)
 - 🚚 **Giden İrsaliye Gönderimi**
 - 📥 **Fatura/İrsaliye Detay Görüntüleme**
 - 🖨️ **PDF İndirme ve Yazdırma**
@@ -55,6 +57,7 @@ EFaturaDelphi/
 ├── 💾 SettingsManager.pas             # Ayar yönetimi sınıfı
 ├── 🏗️ MySoftAPIBase.pas              # Base API sınıfı
 ├── 📊 MySoftGelenFaturaAPI.pas       # Gelen fatura API sınıfı
+├── 📤 MySoftGidenFaturaAPI.pas       # Giden fatura API sınıfı
 ├── 📦 MySoftGelenIrsaliyeAPI.pas     # Gelen irsaliye API sınıfı
 ├── 🔧 MySoftAPITypes.pas             # API tipleri ve sabitler
 └── 📚 Mysoft Entegrasyon Dokumanlari/
@@ -73,15 +76,28 @@ EFaturaDelphi/
 │ - DateTimePicker│    │ + CreateClient() │    │ + SaveSettings()│
 │ + LoadInvoices()│    │ - HandleResponse()│    │ + ValidateVKN() │
 │ + LoadDespatches│    └──────────────────┘    └─────────────────┘
-└─────────────────┘             │
-                                 ├──────────────────────────┐
-                                 │                          │
-              ┌──────────────────▼──┐        ┌──────────────▼──────┐
-              │TMySoftGelenFaturaAPI│        │TMySoftGelenIrsaliyeAPI│
-              │                     │        │                       │
-              │+ GetInvoiceList()   │        │+ GetDespatchList()    │
-              │+ GetInvoiceDetail() │        │+ GetDespatchDetail()  │
-              └─────────────────────┘        └───────────────────────┘
+│ + LoadOutgoing  │             │
+└─────────────────┘             ├──────────────────────────────────────┐
+                                │                          │           │
+              ┌─────────────────▼──┐  ┌──────────────▼─────┐ ┌─────────▼──────┐
+              │TMySoftGelenFaturaAPI│  │TMySoftGidenFaturaAPI│ │TMySoftGelenIrsal│
+              │                     │  │                     │ │iyeAPI           │
+              │+ GetInvoiceList()   │  │+ GetOutgoingList()  │ │+ GetDespatchList│
+              │+ GetInvoiceDetail() │  │+ CreateDraft()      │ │+ GetDespatchDet.│
+              └─────────────────────┘  │+ SendInvoice()      │ └─────────────────┘
+                                       │+ ValidateData()     │
+                      ┌────────────────┤+ TInvoiceBuilder    │
+                      │                └─────────────────────┘
+                      │
+              ┌───────▼──────────┐
+              │  TInvoiceBuilder │
+              │                  │
+              │+ SetInvoiceInfo()│
+              │+ SetBuyerInfo()  │
+              │+ AddLine()       │
+              │+ Build()         │
+              │+ Validate()      │
+              └──────────────────┘
 ```
 
 ### 🔗 **API Entegrasyon Akışı**
@@ -318,7 +334,24 @@ Content-Type: application/json
 }
 ```
 
-#### **3. Gelen İrsaliye Listesi**
+#### **3. Giden Fatura Listesi**
+```http
+POST https://edocumentapi.mytest.tr/api/InvoiceOutbox/GetInvoiceOutboxWithHeaderInfoList
+Authorization: Bearer [TOKEN]
+Content-Type: application/json
+
+{
+  "startDate": "2025-01-01",
+  "endDate": "2025-01-31",
+  "limit": 100,
+  "pkAlias": "",
+  "sessionStatus": "",
+  "tenantIdentifierNumber": "",
+  "afterValue": ""
+}
+```
+
+#### **4. Gelen İrsaliye Listesi**
 ```http
 POST https://edocumentapi.mytest.tr/api/despatchinbox/getdespatchinboxwithheaderinfolistforperiod
 Authorization: Bearer [TOKEN]
@@ -332,6 +365,41 @@ Content-Type: application/json
   "sessionStatus": "",
   "tenantIdentifierNumber": "",
   "afterValue": ""
+}
+```
+
+#### **5. Fatura Taslağı Oluşturma**
+```http
+POST https://edocumentapi.mytest.tr/api/Invoice/InvoiceDraftNew
+Authorization: Bearer [TOKEN]
+Content-Type: application/json
+
+{
+  "invoiceInfo": {
+    "invoiceType": "SATIS",
+    "profile": "TICARIFATURA",
+    "docDate": "2025-01-12",
+    "docNo": "AA2025000001"
+  },
+  "buyerInfo": {
+    "vknTckn": "1234567890",
+    "name": "ALICI FIRMA",
+    "address": "..."
+  },
+  "sellerInfo": {
+    "vknTckn": "0987654321",
+    "name": "SATICI FIRMA",
+    "address": "..."
+  },
+  "invoiceLines": [
+    {
+      "lineNumber": 1,
+      "itemName": "Ürün Adı",
+      "quantity": 10,
+      "unitPrice": 100.00,
+      "taxRate": 20
+    }
+  ]
 }
 ```
 
@@ -428,6 +496,18 @@ Bu proje işinize yaradıysa, lütfen **⭐ yıldız** vererek destekleyin!
 
 ## 🏷️ **Sürüm Geçmişi**
 
+### 📤 **v1.2.0** (2025-01-12) - Giden Fatura API Desteği
+- ✅ **Giden Fatura API** entegrasyonu
+- ✅ **TMySoftGidenFaturaAPI** sınıfı
+- ✅ **15 sütunlu giden fatura görünümü** (ID, Fatura No, Tarih, VKN/TCKN, Ünvan, Durum, Profil, Tip, ETTN, Ana Para, Vergi Hariç/Dahil, Ödenecek, KDV, Gönderim)
+- ✅ **TInvoiceBuilder helper sınıfı** (Fatura oluşturma desteği)
+- ✅ **Fatura validation sistemi** (Veri doğrulama)
+- ✅ **CreateInvoiceDraft API** (Taslak oluşturma)
+- ✅ **SendInvoice API** (Fatura gönderimi)
+- ✅ **GetInvoiceStatus API** (Durum sorgulama)
+- ✅ **Doğru endpoint kullanımı** (/api/InvoiceOutbox/GetInvoiceOutboxWithHeaderInfoList)
+- ✅ **Tam çift yönlü fatura sistemi** (Gelen + Giden)
+
 ### 📦 **v1.1.0** (2025-01-12) - İrsaliye API Desteği
 - ✅ **Gelen İrsaliye API** entegrasyonu
 - ✅ **Modüler mimari** (Base API sınıfı)
@@ -448,10 +528,10 @@ Bu proje işinize yaradıysa, lütfen **⭐ yıldız** vererek destekleyin!
 - ✅ Türkçe karakter desteği
 
 ### 🔮 **Gelecek Sürümler**
-- 🔄 **v1.2.0**: Giden fatura gönderimi
 - 🔄 **v1.3.0**: Giden irsaliye gönderimi
-- 🔄 **v1.4.0**: PDF indirme ve yazdırma
-- 🔄 **v1.5.0**: Veritabanı entegrasyonu
+- 🔄 **v1.4.0**: Fatura oluşturma UI formu
+- 🔄 **v1.5.0**: PDF indirme ve yazdırma
+- 🔄 **v1.6.0**: Veritabanı entegrasyonu
 - 🔄 **v2.0.0**: Multi-provider desteği (Foriba, Kolaysoft, ICE)
 
 ---

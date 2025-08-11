@@ -7,6 +7,45 @@ Versiyonlama [Semantic Versioning](https://semver.org/spec/v2.0.0.html) kurallar
 
 ---
 
+## [v1.2.0] - 2025-01-12 - Giden Fatura API Desteği 📤
+
+### ✅ Eklenen Özellikler
+- **Giden Fatura API entegrasyonu** - MySoft e-Fatura gönderim sistemi desteği
+- **TMySoftGidenFaturaAPI sınıfı** - Özel giden fatura API wrapper'ı
+- **15 sütunlu giden fatura görünümü** - Detaylı gönderim bilgileri
+  - ID, Fatura No, Tarih, VKN/TCKN, Ünvan, Durum
+  - Profil, Tip, ETTN, Ana Para, Vergi Hariç/Dahil, Ödenecek, KDV, Gönderim
+- **TInvoiceBuilder helper sınıfı** - Fluent API ile fatura oluşturma
+  - SetInvoiceInfo(), SetBuyerInfo(), SetSellerInfo()
+  - AddInvoiceLine(), Build(), Validate()
+- **Fatura validation sistemi** - Veri doğrulama ve hata kontrolü
+- **CreateInvoiceDraft API** - Fatura taslağı oluşturma
+- **SendInvoice API** - Fatura gönderim işlemi
+- **GetInvoiceStatus API** - Fatura durum sorgulama
+- **GetOutgoingInvoiceList API** - Giden fatura listesi
+
+### 🔧 Düzeltmeler
+- **Doğru endpoint kullanımı** - `/api/InvoiceOutbox/GetInvoiceOutboxWithHeaderInfoList`
+- **MySoftAPITypes.pas** - GIDEN_FATURA_ENDPOINT sabiti eklendi
+- **MainForm güncellemeleri** - Giden Faturalar sekmesi aktif
+- **Button handler'ları** - Giden fatura sorgulama desteği
+
+### 📚 Dokümantasyon
+- **README.md güncellendi** - Giden Fatura API dokümantasyonu
+- **API endpoint'leri** - 5 yeni endpoint dokümante edildi
+- **TInvoiceBuilder kullanım örnekleri** - Fatura oluşturma rehberi
+- **Sınıf diyagramı genişletildi** - Giden fatura sınıfları eklendi
+- **Response formatları** - Giden fatura API yanıtları
+
+### 🏗️ Teknik İyileştirmeler
+- **Tam çift yönlü sistem** - Gelen + Giden fatura desteği
+- **Fluent API pattern** - TInvoiceBuilder ile kolay kullanım
+- **Validation framework** - Fatura veri doğrulama sistemi
+- **Error handling** - Detaylı hata yönetimi
+- **Code organization** - Modüler yapı korundu
+
+---
+
 ## [v1.1.0] - 2025-01-12 - İrsaliye API Desteği 📦
 
 ### ✅ Eklenen Özellikler
@@ -88,25 +127,25 @@ Versiyonlama [Semantic Versioning](https://semver.org/spec/v2.0.0.html) kurallar
 
 ## Gelecek Sürümler 🔮
 
-### [v1.2.0] - Planlanan - Giden Fatura Gönderimi
-- UBL-TR XML oluşturma
-- E-imza entegrasyonu
-- Fatura gönderim API'si
-- Durum takip sistemi
-
 ### [v1.3.0] - Planlanan - Giden İrsaliye Gönderimi
 - İrsaliye XML oluşturma
 - Lojistik bilgileri yönetimi
 - Taşıyıcı entegrasyonu
 - Mal kabul süreçleri
 
-### [v1.4.0] - Planlanan - PDF ve Yazdırma
+### [v1.4.0] - Planlanan - Fatura Oluşturma UI
+- Fatura oluşturma formu
+- TInvoiceBuilder UI entegrasyonu
+- Müşteri seçimi
+- Ürün katalog yönetimi
+
+### [v1.5.0] - Planlanan - PDF ve Yazdırma
 - PDF indirme API'si
 - Yazdırma modülü
 - Belge arşivleme
 - E-posta gönderimi
 
-### [v1.5.0] - Planlanan - Veritabanı Entegrasyonu
+### [v1.6.0] - Planlanan - Veritabanı Entegrasyonu
 - MySQL/MSSQL/PostgreSQL desteği
 - ORM entegrasyonu
 - Veri senkronizasyonu

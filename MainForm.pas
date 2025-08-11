@@ -7,7 +7,7 @@ uses
   Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.ExtCtrls,
   Vcl.ComCtrls, Vcl.Grids, System.StrUtils, System.JSON, System.Generics.Collections,
   FirmaAyarlariForm, EntegratorAyarlariForm, SettingsManager, MySoftAPITypes, 
-  MySoftAPIBase, MySoftGelenFaturaAPI, MySoftGelenIrsaliyeAPI;
+  MySoftAPIBase, MySoftGelenFaturaAPI, MySoftGelenIrsaliyeAPI, MySoftGidenFaturaAPI;
 
 type
   TForm1 = class(TForm)
@@ -34,17 +34,23 @@ type
     { Private declarations }
     FGelenFaturaAPI: TMySoftGelenFaturaAPI;
     FGelenIrsaliyeAPI: TMySoftGelenIrsaliyeAPI;
+    FGidenFaturaAPI: TMySoftGidenFaturaAPI;
     
     procedure GelenFaturalariGoster;
     procedure GelenIrsaliyeleriGoster;
+    procedure GidenFaturalariGoster;
     procedure SetupDataGrid;
     procedure SetupDespatchGrid;
+    procedure SetupOutgoingInvoiceGrid;
     procedure LoadInvoiceDataToGrid(StartDate, EndDate: TDateTime);
     procedure LoadDespatchDataToGrid(StartDate, EndDate: TDateTime);
+    procedure LoadOutgoingInvoiceDataToGrid(StartDate, EndDate: TDateTime);
     procedure AddInvoiceToGrid(const InvoiceObj: TJSONObject; Row: Integer);
     procedure AddDespatchToGrid(const DespatchObj: TJSONObject; Row: Integer);
+    procedure AddOutgoingInvoiceToGrid(const InvoiceObj: TJSONObject; Row: Integer);
     procedure ClearDataGrid;
     procedure ClearDespatchGrid;
+    procedure ClearOutgoingInvoiceGrid;
     function FormatCurrencyTL(const Value: Double): string;
     function FormatDateTR(const DateStr: string): string;
 
@@ -66,6 +72,7 @@ begin
   // MySoft API sınıflarını initialize et
   FGelenFaturaAPI := TMySoftGelenFaturaAPI.Create;
   FGelenIrsaliyeAPI := TMySoftGelenIrsaliyeAPI.Create;
+  FGidenFaturaAPI := TMySoftGidenFaturaAPI.Create;
   
   // Form ayarları
   Caption := MYSOFT_DELPHI_API_NAME + ' v' + MYSOFT_DELPHI_API_VERSION;
@@ -137,15 +144,18 @@ begin
   end
   else if NodeText = 'Giden Faturalar' then
   begin
-    StringGrid1.Visible := False;
-    pnlTarihFiltre.Visible := False;
-    Memo1.Lines.Add('Giden Faturalar Modülü');
-    Memo1.Lines.Add('========================');
-    Memo1.Lines.Add('');
-    Memo1.Lines.Add('• Yeni e-fatura oluşturma');
-    Memo1.Lines.Add('• UBL-TR formatında XML üretme');
-    Memo1.Lines.Add('• E-imza ile imzalama');
-    Memo1.Lines.Add('• Entegratör üzerinden gönderme');
+    // Giden Faturalar ekranını göster
+    GidenFaturalariGoster;
+    SetupOutgoingInvoiceGrid;
+    ClearOutgoingInvoiceGrid;
+    
+    // Filtre panelini göster
+    pnlTarihFiltre.Visible := True;
+    StringGrid1.Visible := True;
+    
+    // Varsayılan tarih aralığı (son 30 gün)
+    dtpBaslangic.Date := Now - 30;
+    dtpBitis.Date := Now;
   end
   else if NodeText = 'Gelen İrsaliyeler' then
   begin
@@ -680,6 +690,13 @@ begin
       LoadInvoiceDataToGrid(dtpBaslangic.Date, dtpBitis.Date);
       Memo1.Lines.Add('=== FATURA API SORGULAMA TAMAMLANDI ===');
     end
+    else if TreeView1.Selected.Text = 'Giden Faturalar' then
+    begin
+      Memo1.Lines.Add('');
+      Memo1.Lines.Add('=== GİDEN FATURA API SORGULAMA ===');
+      LoadOutgoingInvoiceDataToGrid(dtpBaslangic.Date, dtpBitis.Date);
+      Memo1.Lines.Add('=== GİDEN FATURA API SORGULAMA TAMAMLANDI ===');
+    end
     else if TreeView1.Selected.Text = 'Gelen İrsaliyeler' then
     begin
       Memo1.Lines.Add('');
@@ -698,10 +715,18 @@ begin
     if TreeView1.Selected.Text = 'Gelen Faturalar' then
     begin
       Memo1.Lines.Add('');
-      Memo1.Lines.Add('=== TÜM FATURALAR (GENİŞ ARAMA) ===');
+      Memo1.Lines.Add('=== TÜM GELEN FATURALAR (GENİŞ ARAMA) ===');
       Memo1.Lines.Add('Tarih aralığı: 01.01.2024 - 31.12.2025');
       LoadInvoiceDataToGrid(EncodeDate(2024, 1, 1), EncodeDate(2025, 12, 31));
       Memo1.Lines.Add('=== FATURA API SORGULAMA TAMAMLANDI ===');
+    end
+    else if TreeView1.Selected.Text = 'Giden Faturalar' then
+    begin
+      Memo1.Lines.Add('');
+      Memo1.Lines.Add('=== TÜM GİDEN FATURALAR (GENİŞ ARAMA) ===');
+      Memo1.Lines.Add('Tarih aralığı: 01.01.2024 - 31.12.2025');
+      LoadOutgoingInvoiceDataToGrid(EncodeDate(2024, 1, 1), EncodeDate(2025, 12, 31));
+      Memo1.Lines.Add('=== GİDEN FATURA API SORGULAMA TAMAMLANDI ===');
     end
     else if TreeView1.Selected.Text = 'Gelen İrsaliyeler' then
     begin
@@ -970,6 +995,262 @@ begin
 end;
 
 procedure TForm1.ClearDespatchGrid;
+var
+  i: Integer;
+begin
+  // Grid'i temizle (header hariç)
+  StringGrid1.RowCount := 2; // Header + 1 boş satır (minimum gereksinim)
+  StringGrid1.FixedRows := 1;
+  
+  // Boş satırı temizle
+  for i := 0 to StringGrid1.ColCount - 1 do
+    StringGrid1.Cells[i, 1] := '';
+end;
+
+// ============================================================================
+// GİDEN FATURA API METODLARI
+// ============================================================================
+
+procedure TForm1.GidenFaturalariGoster;
+var
+  EntegratorAyarlari: TEntegratorAyarlari;
+begin
+  Label1.Caption := 'Giden Faturalar';
+  
+  Memo1.Lines.Clear;
+  
+  // Entegrator ayarlarini yukle
+  EntegratorAyarlari := TSettingsManager.LoadEntegratorAyarlari;
+  
+  Memo1.Lines.Add('BAGLANTI BiLGiLERi:');
+  Memo1.Lines.Add('Test URL: ' + EntegratorAyarlari.TestURL);
+  Memo1.Lines.Add('Kullanici: ' + EntegratorAyarlari.KullaniciAdi);
+  Memo1.Lines.Add('Durum: ' + IfThen(TSettingsManager.EntegratorSettingsFileExists, 'Ayarlar yuklendi', 'Varsayilan ayarlar'));
+  Memo1.Lines.Add('');
+  Memo1.Lines.Add('MySoft API Baglantisi: HAZIR (GERCEK API)');
+  Memo1.Lines.Add('');
+  Memo1.Lines.Add('=== GİDEN FATURALAR ===');
+  Memo1.Lines.Add('');
+  Memo1.Lines.Add('MySoft e-Fatura sistemi üzerinden gönderdiğiniz');
+  Memo1.Lines.Add('elektronik faturaları görüntüleyebilirsiniz.');
+  Memo1.Lines.Add('');
+  Memo1.Lines.Add('• Tarih aralığı seçin');
+  Memo1.Lines.Add('• "Sorgula" butonuna tıklayın');
+  Memo1.Lines.Add('• Gönderilen fatura detaylarını inceleyin');
+  Memo1.Lines.Add('• Fatura durumlarını takip edin');
+  Memo1.Lines.Add('');
+  Memo1.Lines.Add('NOT: ARTIK SİMÜLASYON YOK - GERÇEK API BAĞLANTISI!');
+  Memo1.Lines.Add('');
+  Memo1.Lines.Add('=== GERÇEK MySoft API SORGULAMA ===');
+  Memo1.Lines.Add('=== TÜM KAYITLAR (GERÇEK API) ===');
+  Memo1.Lines.Add('Tarih aralığı seçerek "Sorgula" butonuna tıklayın.');
+end;
+
+procedure TForm1.SetupOutgoingInvoiceGrid;
+begin
+  // Grid ayarları
+  StringGrid1.ColCount := 15;
+  StringGrid1.RowCount := 2; // Header + 1 boş satır (minimum gereksinim)
+  StringGrid1.FixedRows := 1;
+  StringGrid1.FixedCols := 0;
+  StringGrid1.Options := StringGrid1.Options + [goRowSelect];
+  
+  // Kolon başlıkları
+  StringGrid1.Cells[0, 0] := 'ID';
+  StringGrid1.Cells[1, 0] := 'Fatura No';
+  StringGrid1.Cells[2, 0] := 'Tarih';
+  StringGrid1.Cells[3, 0] := 'VKN/TCKN';
+  StringGrid1.Cells[4, 0] := 'Ünvan';
+  StringGrid1.Cells[5, 0] := 'Durum';
+  StringGrid1.Cells[6, 0] := 'Profil';
+  StringGrid1.Cells[7, 0] := 'Tip';
+  StringGrid1.Cells[8, 0] := 'ETTN';
+  StringGrid1.Cells[9, 0] := 'Ana Para';
+  StringGrid1.Cells[10, 0] := 'Vergi Hariç';
+  StringGrid1.Cells[11, 0] := 'Vergi Dahil';
+  StringGrid1.Cells[12, 0] := 'Ödenecek';
+  StringGrid1.Cells[13, 0] := 'KDV Tutarı';
+  StringGrid1.Cells[14, 0] := 'Gönderim';
+  
+  // Kolon genişlikleri
+  StringGrid1.ColWidths[0] := 60;    // ID
+  StringGrid1.ColWidths[1] := 140;   // Fatura No
+  StringGrid1.ColWidths[2] := 80;    // Tarih
+  StringGrid1.ColWidths[3] := 90;    // VKN/TCKN
+  StringGrid1.ColWidths[4] := 180;   // Ünvan
+  StringGrid1.ColWidths[5] := 100;   // Durum
+  StringGrid1.ColWidths[6] := 100;   // Profil
+  StringGrid1.ColWidths[7] := 80;    // Tip
+  StringGrid1.ColWidths[8] := 120;   // ETTN
+  StringGrid1.ColWidths[9] := 90;    // Ana Para
+  StringGrid1.ColWidths[10] := 90;   // Vergi Hariç
+  StringGrid1.ColWidths[11] := 90;   // Vergi Dahil
+  StringGrid1.ColWidths[12] := 90;   // Ödenecek
+  StringGrid1.ColWidths[13] := 80;   // KDV Tutarı
+  StringGrid1.ColWidths[14] := 80;   // Gönderim
+end;
+
+procedure TForm1.LoadOutgoingInvoiceDataToGrid(StartDate, EndDate: TDateTime);
+var
+  EntegratorAyarlari: TEntegratorAyarlari;
+  Token, APIResponse: string;
+  StartDateStr, EndDateStr: string;
+  JSONObj: TJSONObject;
+  DataArray: TJSONArray;
+  i, Row: Integer;
+  InvoiceObj: TJSONObject;
+begin
+  try
+    // Mevcut verileri temizle
+    ClearOutgoingInvoiceGrid;
+    
+    // Entegratör ayarlarını yükle
+    EntegratorAyarlari := TSettingsManager.LoadEntegratorAyarlari;
+    
+    // Tarih formatlarını hazırla
+    StartDateStr := FormatDateTime('yyyy-mm-dd', StartDate);
+    EndDateStr := FormatDateTime('yyyy-mm-dd', EndDate);
+    
+    // Kullanıcıya işlem bilgisi ver
+    Memo1.Lines.Add('GERÇEK MySoft API Bağlantısı Başlatılıyor...');
+    Memo1.Lines.Add('URL: ' + EntegratorAyarlari.TestURL);
+    Memo1.Lines.Add('Kullanıcı: ' + EntegratorAyarlari.KullaniciAdi);
+    
+    // Token alma işlemi
+    Memo1.Lines.Add('1. Token alınıyor...');
+    Token := FGidenFaturaAPI.GetAccessToken(EntegratorAyarlari.KullaniciAdi, EntegratorAyarlari.Sifre);
+    
+    // Token hata kontrolü
+    if Pos('HATA:', Token) > 0 then
+    begin
+      Memo1.Lines.Add('TOKEN HATASI: ' + Token);
+      Exit;
+    end;
+    
+    Memo1.Lines.Add('Token başarıyla alındı! (Uzunluk: ' + IntToStr(Length(Token)) + ' karakter)');
+    
+    // Giden fatura listesi sorgulama
+    Memo1.Lines.Add('2. Giden faturalar getiriliyor...');
+    Memo1.Lines.Add('Tarih aralığı: ' + StartDateStr + ' - ' + EndDateStr);
+    
+    APIResponse := FGidenFaturaAPI.GetOutgoingInvoiceList(Token, StartDateStr, EndDateStr);
+    
+    // API yanıt hata kontrolü
+    if Pos('HATA:', APIResponse) > 0 then
+    begin
+      Memo1.Lines.Add('GİDEN FATURA LİSTESİ HATASI: ' + APIResponse);
+      Exit;
+    end;
+    
+    // JSON parsing ve veri işleme - GÜVENLİ TYPECAST
+    JSONObj := TJSONObject.ParseJSONValue(APIResponse) as TJSONObject;
+    if Assigned(JSONObj) then
+    try
+      // Data array'ini güvenli şekilde al
+      DataArray := nil;
+      if JSONObj.TryGetValue<TJSONArray>('data', DataArray) and Assigned(DataArray) then
+      begin
+        // Grid satırlarını ayarla
+        StringGrid1.RowCount := DataArray.Count + 1; // +1 header için
+        
+        // Her fatura için grid'e ekleme döngüsü
+        for i := 0 to DataArray.Count - 1 do
+        begin
+          InvoiceObj := DataArray.Items[i] as TJSONObject;
+          Row := i + 1; // Header'dan sonra (0. satır header)
+          
+          // Fatura verilerini grid'e ekleme
+          AddOutgoingInvoiceToGrid(InvoiceObj, Row);
+        end;
+        
+        // Başarı mesajı
+        Memo1.Lines.Add(Format('✓ %d adet giden fatura başarıyla yüklendi.', [DataArray.Count]));
+      end
+      else
+      begin
+        Memo1.Lines.Add('ℹ Belirtilen tarih aralığında giden fatura bulunamadı.');
+        Memo1.Lines.Add('JSON Response: ' + Copy(APIResponse, 1, 200) + '...');
+      end;
+      
+    finally
+      JSONObj.Free;
+    end
+    else
+    begin
+      // API response'unu debug için göster
+      Memo1.Lines.Add('API PARSE HATASI - Response:');
+      Memo1.Lines.Add(Copy(APIResponse, 1, 500) + '...');
+      ShowMessage('API yanıtı işlenemedi! Detaylar memo''da.');
+    end;
+    
+    Memo1.Lines.Add('=== GİDEN FATURA API SORGULAMA TAMAMLANDI ===');
+    
+  except
+    on E: Exception do
+    begin
+      Memo1.Lines.Add('GENEL HATA: ' + E.Message);
+      if APIResponse <> '' then
+        Memo1.Lines.Add('API Response: ' + Copy(APIResponse, 1, 300));
+      ShowMessage('Hata oluştu: ' + E.Message);
+    end;
+  end;
+end;
+
+procedure TForm1.AddOutgoingInvoiceToGrid(const InvoiceObj: TJSONObject; Row: Integer);
+var
+  // Temel fatura bilgileri
+  ID, FaturaNo, Tarih, VknTckn, Unvan, Durum: string;
+  Profile, InvoiceType, ETTN, SendStatus: string;
+  
+  // Tutar alanları
+  LineExtensionAmount, TaxExclusiveAmount, TaxInclusiveAmount: Double;
+  PayableAmount, TaxTotalTra: Double;
+begin
+  // Güvenlik kontrolü
+  if not Assigned(InvoiceObj) then Exit;
+  
+  // Temel bilgiler
+  ID := InvoiceObj.GetValue<string>('id', '0');
+  FaturaNo := InvoiceObj.GetValue<string>('docNo', 'N/A');
+  Tarih := FormatDateTR(InvoiceObj.GetValue<string>('docDate', ''));
+  VknTckn := InvoiceObj.GetValue<string>('vknTckn', 'N/A');
+  Unvan := InvoiceObj.GetValue<string>('accountName', 'N/A');
+  Durum := InvoiceObj.GetValue<string>('invoiceStatusText', 'BILINMIYOR');
+  
+  // Fatura tip ve profil bilgileri
+  Profile := InvoiceObj.GetValue<string>('profile', 'N/A');
+  InvoiceType := InvoiceObj.GetValue<string>('invoiceType', 'N/A');
+  
+  // Elektronik belge bilgileri
+  ETTN := InvoiceObj.GetValue<string>('ettn', 'N/A');
+  SendStatus := InvoiceObj.GetValue<string>('sendStatus', 'N/A');
+  
+  // Tutar bilgileri
+  LineExtensionAmount := InvoiceObj.GetValue<Double>('lineExtensionAmount', 0);
+  TaxExclusiveAmount := InvoiceObj.GetValue<Double>('taxExclusiveAmount', 0);
+  TaxInclusiveAmount := InvoiceObj.GetValue<Double>('taxInclusiveAmount', 0);
+  PayableAmount := InvoiceObj.GetValue<Double>('payableAmount', 0);
+  TaxTotalTra := InvoiceObj.GetValue<Double>('taxTotalTra', 0);
+  
+  // Verileri grid'e yazma (15 kolon)
+  StringGrid1.Cells[0, Row] := ID;
+  StringGrid1.Cells[1, Row] := Copy(FaturaNo, 1, 20);
+  StringGrid1.Cells[2, Row] := Tarih;
+  StringGrid1.Cells[3, Row] := VknTckn;
+  StringGrid1.Cells[4, Row] := Copy(Unvan, 1, 25);
+  StringGrid1.Cells[5, Row] := Copy(Durum, 1, 15);
+  StringGrid1.Cells[6, Row] := Copy(Profile, 1, 15);
+  StringGrid1.Cells[7, Row] := Copy(InvoiceType, 1, 10);
+  StringGrid1.Cells[8, Row] := Copy(ETTN, 1, 15) + '...';
+  StringGrid1.Cells[9, Row] := FormatCurrencyTL(LineExtensionAmount);
+  StringGrid1.Cells[10, Row] := FormatCurrencyTL(TaxExclusiveAmount);
+  StringGrid1.Cells[11, Row] := FormatCurrencyTL(TaxInclusiveAmount);
+  StringGrid1.Cells[12, Row] := FormatCurrencyTL(PayableAmount);
+  StringGrid1.Cells[13, Row] := FormatCurrencyTL(TaxTotalTra);
+  StringGrid1.Cells[14, Row] := Copy(SendStatus, 1, 10);
+end;
+
+procedure TForm1.ClearOutgoingInvoiceGrid;
 var
   i: Integer;
 begin
