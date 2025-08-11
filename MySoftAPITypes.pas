@@ -7,7 +7,7 @@ uses
 
 const
   { MySoft Delphi API Sürüm Bilgileri }
-  MYSOFT_DELPHI_API_VERSION = '1.0.0';
+  MYSOFT_DELPHI_API_VERSION = '1.1.0';
   MYSOFT_DELPHI_API_NAME = 'MySoft E-Fatura/E-İrsaliye Delphi API';
   MYSOFT_DELPHI_API_AUTHOR = 'Mert Bilişim - info@mertbilisim.com.tr';
   MYSOFT_DELPHI_API_DATE = '2025-01-12';
@@ -47,7 +47,7 @@ type
     
     const TOKEN_ENDPOINT = '/oauth/token';
     const GELEN_FATURA_ENDPOINT = '/api/invoiceinbox/getinvoiceinboxwithheaderinfolistforperiod';
-    const GELEN_IRSALIYE_ENDPOINT = '/api/DespatchInbox/getDespatchInboxListForPeriod';
+    const GELEN_IRSALIYE_ENDPOINT = '/api/despatchinbox/getdespatchinboxwithheaderinfolistforperiod';
   end;
   
   // Base MySoft API Interface

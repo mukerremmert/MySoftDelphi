@@ -5,9 +5,9 @@ interface
 uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes,
   Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.ExtCtrls,
-  Vcl.ComCtrls, Vcl.Grids, System.StrUtils, System.JSON, FirmaAyarlariForm, 
-  EntegratorAyarlariForm, SettingsManager, MySoftAPITypes, MySoftAPIBase, 
-  MySoftGelenFaturaAPI;
+  Vcl.ComCtrls, Vcl.Grids, System.StrUtils, System.JSON, System.Generics.Collections,
+  FirmaAyarlariForm, EntegratorAyarlariForm, SettingsManager, MySoftAPITypes, 
+  MySoftAPIBase, MySoftGelenFaturaAPI, MySoftGelenIrsaliyeAPI;
 
 type
   TForm1 = class(TForm)
@@ -33,12 +33,18 @@ type
   private
     { Private declarations }
     FGelenFaturaAPI: TMySoftGelenFaturaAPI;
+    FGelenIrsaliyeAPI: TMySoftGelenIrsaliyeAPI;
     
     procedure GelenFaturalariGoster;
+    procedure GelenIrsaliyeleriGoster;
     procedure SetupDataGrid;
+    procedure SetupDespatchGrid;
     procedure LoadInvoiceDataToGrid(StartDate, EndDate: TDateTime);
+    procedure LoadDespatchDataToGrid(StartDate, EndDate: TDateTime);
     procedure AddInvoiceToGrid(const InvoiceObj: TJSONObject; Row: Integer);
+    procedure AddDespatchToGrid(const DespatchObj: TJSONObject; Row: Integer);
     procedure ClearDataGrid;
+    procedure ClearDespatchGrid;
     function FormatCurrencyTL(const Value: Double): string;
     function FormatDateTR(const DateStr: string): string;
 
@@ -59,6 +65,7 @@ var
 begin
   // MySoft API sınıflarını initialize et
   FGelenFaturaAPI := TMySoftGelenFaturaAPI.Create;
+  FGelenIrsaliyeAPI := TMySoftGelenIrsaliyeAPI.Create;
   
   // Form ayarları
   Caption := MYSOFT_DELPHI_API_NAME + ' v' + MYSOFT_DELPHI_API_VERSION;
@@ -142,15 +149,17 @@ begin
   end
   else if NodeText = 'Gelen İrsaliyeler' then
   begin
-    StringGrid1.Visible := False;
-    pnlTarihFiltre.Visible := False;
-    Memo1.Lines.Add('Gelen İrsaliyeler Modülü');
-    Memo1.Lines.Add('==========================');
-    Memo1.Lines.Add('');
-    Memo1.Lines.Add('• Size gelen e-irsaliyeleri görüntüleme');
-    Memo1.Lines.Add('• İrsaliye detaylarını inceleme');
-    Memo1.Lines.Add('• Stok hareketlerini takip etme');
-    Memo1.Lines.Add('• Depo sistemine aktarma');
+    GelenIrsaliyeleriGoster;
+    SetupDespatchGrid;
+    ClearDespatchGrid;
+    
+    // Filtre panelini göster
+    pnlTarihFiltre.Visible := True;
+    StringGrid1.Visible := True;
+    
+    // Varsayılan tarih aralığı (son 30 gün)
+    dtpBaslangic.Date := Now - 30;
+    dtpBitis.Date := Now;
   end
   else if NodeText = 'Giden İrsaliyeler' then
   begin
@@ -657,29 +666,320 @@ procedure TForm1.btnFiltreleClick(Sender: TObject);
 begin
   if dtpBitis.Date < dtpBaslangic.Date then
   begin
-    ShowMessage('Bitis tarihi baslangic tarihinden kucuk olamaz!');
+    ShowMessage('Bitiş tarihi başlangıç tarihinden küçük olamaz!');
     Exit;
   end;
   
-  // GERCEK API sorgulama baslatiliyor
-  Memo1.Lines.Add('');
-  Memo1.Lines.Add('=== GERCEK MySoft API SORGULAMA ===');
-  
-  LoadInvoiceDataToGrid(dtpBaslangic.Date, dtpBitis.Date);
-  
-  Memo1.Lines.Add('=== API SORGULAMA TAMAMLANDI ===');
+  // Hangi sekmenin aktif olduğunu kontrol et
+  if Assigned(TreeView1.Selected) then
+  begin
+    if TreeView1.Selected.Text = 'Gelen Faturalar' then
+    begin
+      Memo1.Lines.Add('');
+      Memo1.Lines.Add('=== GELEN FATURA API SORGULAMA ===');
+      LoadInvoiceDataToGrid(dtpBaslangic.Date, dtpBitis.Date);
+      Memo1.Lines.Add('=== FATURA API SORGULAMA TAMAMLANDI ===');
+    end
+    else if TreeView1.Selected.Text = 'Gelen İrsaliyeler' then
+    begin
+      Memo1.Lines.Add('');
+      Memo1.Lines.Add('=== GELEN İRSALİYE API SORGULAMA ===');
+      LoadDespatchDataToGrid(dtpBaslangic.Date, dtpBitis.Date);
+      Memo1.Lines.Add('=== İRSALİYE API SORGULAMA TAMAMLANDI ===');
+    end;
+  end;
 end;
 
 procedure TForm1.btnTumunuClick(Sender: TObject);
 begin
+  // Hangi sekmenin aktif olduğunu kontrol et
+  if Assigned(TreeView1.Selected) then
+  begin
+    if TreeView1.Selected.Text = 'Gelen Faturalar' then
+    begin
+      Memo1.Lines.Add('');
+      Memo1.Lines.Add('=== TÜM FATURALAR (GENİŞ ARAMA) ===');
+      Memo1.Lines.Add('Tarih aralığı: 01.01.2024 - 31.12.2025');
+      LoadInvoiceDataToGrid(EncodeDate(2024, 1, 1), EncodeDate(2025, 12, 31));
+      Memo1.Lines.Add('=== FATURA API SORGULAMA TAMAMLANDI ===');
+    end
+    else if TreeView1.Selected.Text = 'Gelen İrsaliyeler' then
+    begin
+      Memo1.Lines.Add('');
+      Memo1.Lines.Add('=== TÜM İRSALİYELER (GENİŞ ARAMA) ===');
+      Memo1.Lines.Add('Tarih aralığı: 01.01.2024 - 31.12.2025');
+      LoadDespatchDataToGrid(EncodeDate(2024, 1, 1), EncodeDate(2025, 12, 31));
+      Memo1.Lines.Add('=== İRSALİYE API SORGULAMA TAMAMLANDI ===');
+    end;
+  end;
+end;
+
+// ============================================================================
+// İRSALİYE API METODLARI
+// ============================================================================
+
+procedure TForm1.GelenIrsaliyeleriGoster;
+begin
+  Label1.Caption := 'Gelen İrsaliyeler';
+  
+  Memo1.Lines.Clear;
+  Memo1.Lines.Add('=== GELEN İRSALİYELER ===');
   Memo1.Lines.Add('');
-  Memo1.Lines.Add('=== TUM KAYITLAR (GERCEK API) ===');
-  Memo1.Lines.Add('Tarih araligi: 01.01.2024 - 31.12.2025 (Genis arama)');
+  Memo1.Lines.Add('MySoft e-İrsaliye sistemi üzerinden size gelen');
+  Memo1.Lines.Add('elektronik irsaliyeleri görüntüleyebilirsiniz.');
+  Memo1.Lines.Add('');
+  Memo1.Lines.Add('• Tarih aralığı seçin');
+  Memo1.Lines.Add('• "Sorgula" butonuna tıklayın');
+  Memo1.Lines.Add('• İrsaliye detaylarını inceleyin');
+  Memo1.Lines.Add('• ERP sisteminize aktarın');
+  Memo1.Lines.Add('');
+  Memo1.Lines.Add('NOT: ARTIK SİMÜLASYON YOK - GERÇEK API BAĞLANTISI!');
+  Memo1.Lines.Add('');
+  Memo1.Lines.Add('=== GERÇEK MySoft API SORGULAMA ===');
+  Memo1.Lines.Add('=== TÜM KAYITLAR (GERÇEK API) ===');
+  Memo1.Lines.Add('Tarih aralığı seçerek "Sorgula" butonuna tıklayın.');
+end;
+
+procedure TForm1.SetupDespatchGrid;
+begin
+  // Grid ayarları
+  StringGrid1.ColCount := 12;
+  StringGrid1.RowCount := 2; // Header + 1 boş satır (minimum gereksinim)
+  StringGrid1.FixedRows := 1;
+  StringGrid1.FixedCols := 0;
+  StringGrid1.Options := StringGrid1.Options + [goFixedVertLine, goFixedHorzLine, goVertLine, goHorzLine];
   
-  // Tum kayitlari goster (genis tarih araligi)
-  LoadInvoiceDataToGrid(EncodeDate(2024, 1, 1), EncodeDate(2025, 12, 31));
+  // Kolon başlıkları
+  StringGrid1.Cells[0, 0] := 'ID';
+  StringGrid1.Cells[1, 0] := 'İrsaliye No';
+  StringGrid1.Cells[2, 0] := 'Tarih';
+  StringGrid1.Cells[3, 0] := 'VKN/TCKN';
+  StringGrid1.Cells[4, 0] := 'Ünvan';
+  StringGrid1.Cells[5, 0] := 'Durum';
+  StringGrid1.Cells[6, 0] := 'Profil';
+  StringGrid1.Cells[7, 0] := 'Tip';
+  StringGrid1.Cells[8, 0] := 'ETTN';
+  StringGrid1.Cells[9, 0] := 'Kalem Say.';
+  StringGrid1.Cells[10, 0] := 'Toplam Miktar';
+  StringGrid1.Cells[11, 0] := 'Taşıyıcı';
   
-  Memo1.Lines.Add('=== GERCEK API SORGULAMA TAMAMLANDI ===');
+  // Kolon genişlikleri
+  StringGrid1.ColWidths[0] := 50;   // ID
+  StringGrid1.ColWidths[1] := 120;  // İrsaliye No
+  StringGrid1.ColWidths[2] := 80;   // Tarih
+  StringGrid1.ColWidths[3] := 100;  // VKN/TCKN
+  StringGrid1.ColWidths[4] := 200;  // Ünvan
+  StringGrid1.ColWidths[5] := 100;  // Durum
+  StringGrid1.ColWidths[6] := 80;   // Profil
+  StringGrid1.ColWidths[7] := 80;   // Tip
+  StringGrid1.ColWidths[8] := 120;  // ETTN
+  StringGrid1.ColWidths[9] := 80;   // Kalem Say.
+  StringGrid1.ColWidths[10] := 100; // Toplam Miktar
+  StringGrid1.ColWidths[11] := 120; // Taşıyıcı
+end;
+
+procedure TForm1.LoadDespatchDataToGrid(StartDate, EndDate: TDateTime);
+var
+  EntegratorAyarlari: TEntegratorAyarlari;
+  Token, APIResponse: string;
+  StartDateStr, EndDateStr: string;
+  JSONObj: TJSONObject;
+  JSONValue: TJSONValue;
+  DataArray: TJSONArray;
+  i, Row: Integer;
+  DespatchObj: TJSONObject;
+begin
+  try
+    // Mevcut verileri temizle
+    ClearDespatchGrid;
+  
+  // Entegratör ayarlarını yükle
+  EntegratorAyarlari := TSettingsManager.LoadEntegratorAyarlari;
+  
+  // Tarih formatlarını hazırla
+  StartDateStr := FormatDateTime('yyyy-mm-dd', StartDate);
+  EndDateStr := FormatDateTime('yyyy-mm-dd', EndDate);
+  
+  // Kullanıcıya işlem bilgisi ver
+  Memo1.Lines.Add('GERÇEK MySoft API Bağlantısı Başlatılıyor...');
+  Memo1.Lines.Add('URL: ' + EntegratorAyarlari.TestURL);
+  Memo1.Lines.Add('Kullanıcı: ' + EntegratorAyarlari.KullaniciAdi);
+  
+  // Token alma işlemi
+  Memo1.Lines.Add('1. Token alınıyor...');
+  Token := FGelenIrsaliyeAPI.GetAccessToken(EntegratorAyarlari.KullaniciAdi, EntegratorAyarlari.Sifre);
+  
+  // Token hata kontrolü
+  if Pos('HATA:', Token) > 0 then
+  begin
+    Memo1.Lines.Add('TOKEN HATASI: ' + Token);
+    Exit;
+  end;
+  
+  Memo1.Lines.Add('Token başarıyla alındı! (Uzunluk: ' + IntToStr(Length(Token)) + ' karakter)');
+  
+  // İrsaliye listesi sorgulama
+  Memo1.Lines.Add('2. Gelen irsaliyeler getiriliyor...');
+  Memo1.Lines.Add('Tarih aralığı: ' + StartDateStr + ' - ' + EndDateStr);
+  
+  APIResponse := FGelenIrsaliyeAPI.GetDespatchInboxList(Token, StartDateStr, EndDateStr);
+  
+  // API yanıt hata kontrolü
+  if Pos('HATA:', APIResponse) > 0 then
+  begin
+    Memo1.Lines.Add('İRSALİYE LİSTESİ HATASI: ' + APIResponse);
+    Exit;
+  end;
+  
+  // JSON parsing ve veri işleme - GÜVENLİ TYPECAST
+  JSONObj := nil;
+  try
+    JSONValue := TJSONObject.ParseJSONValue(APIResponse);
+    if JSONValue is TJSONObject then
+      JSONObj := JSONValue as TJSONObject
+    else
+    begin
+      Memo1.Lines.Add('HATA: API response TJSONObject değil!');
+      if Assigned(JSONValue) then
+      begin
+        Memo1.Lines.Add('Response type: ' + JSONValue.ClassName);
+        JSONValue.Free;
+      end;
+      Memo1.Lines.Add('Response: ' + Copy(APIResponse, 1, 300));
+      Exit;
+    end;
+  except
+    on E: Exception do
+    begin
+      Memo1.Lines.Add('JSON PARSE HATASI: ' + E.Message);
+      Memo1.Lines.Add('Response ilk 500 karakter:');
+      Memo1.Lines.Add(Copy(APIResponse, 1, 500));
+      Exit;
+    end;
+  end;
+  
+  if Assigned(JSONObj) then
+  try
+    // Data array'ini güvenli şekilde al
+    DataArray := nil;
+    if JSONObj.TryGetValue<TJSONArray>('data', DataArray) and Assigned(DataArray) then
+    begin
+      // Grid satırlarını ayarla
+      StringGrid1.RowCount := DataArray.Count + 1; // +1 header için
+      
+      // Her irsaliye için grid'e ekleme döngüsü
+      for i := 0 to DataArray.Count - 1 do
+      begin
+        DespatchObj := DataArray.Items[i] as TJSONObject;
+        Row := i + 1; // Header'dan sonra (0. satır header)
+        
+        // İrsaliye verilerini grid'e ekleme
+        AddDespatchToGrid(DespatchObj, Row);
+      end;
+      
+      // Başarı mesajı
+      Memo1.Lines.Add(Format('✓ %d adet irsaliye başarıyla yüklendi.', [DataArray.Count]));
+    end
+    else
+    begin
+      Memo1.Lines.Add('ℹ Belirtilen tarih aralığında irsaliye bulunamadı.');
+      Memo1.Lines.Add('JSON Response: ' + Copy(APIResponse, 1, 200) + '...');
+    end;
+    
+  finally
+    JSONObj.Free;
+  end
+  else
+  begin
+    // API response'unu debug için göster
+    Memo1.Lines.Add('API PARSE HATASI - Response:');
+    Memo1.Lines.Add(Copy(APIResponse, 1, 500) + '...');
+    ShowMessage('API yanıtı işlenemedi! Detaylar memo''da.');
+  end;
+  
+  Memo1.Lines.Add('=== İRSALİYE API SORGULAMA TAMAMLANDI ===');
+  
+  except
+    on E: Exception do
+    begin
+      Memo1.Lines.Add('GENEL HATA: ' + E.Message);
+      if APIResponse <> '' then
+        Memo1.Lines.Add('API Response: ' + Copy(APIResponse, 1, 300));
+      ShowMessage('Hata oluştu: ' + E.Message);
+    end;
+  end;
+end;
+
+procedure TForm1.AddDespatchToGrid(const DespatchObj: TJSONObject; Row: Integer);
+var
+  // Temel irsaliye bilgileri
+  ID, IrsaliyeNo, Tarih, VknTckn, Unvan, Durum: string;
+  Profile, DespatchType, ETTN, CarrierName: string;
+  
+  // Sayısal alanlar
+  TotalLineCount: Integer;
+  TotalQuantity: Double;
+begin
+  // Güvenlik kontrolü
+  if not Assigned(DespatchObj) then Exit;
+  
+  // Temel bilgiler
+  ID := DespatchObj.GetValue<string>('id', '0');
+  IrsaliyeNo := DespatchObj.GetValue<string>('docNo', 'N/A');
+  Tarih := FormatDateTR(DespatchObj.GetValue<string>('docDate', ''));
+  VknTckn := DespatchObj.GetValue<string>('vknTckn', 'N/A');
+  Unvan := DespatchObj.GetValue<string>('accountName', 'N/A');
+  Durum := DespatchObj.GetValue<string>('despatchStatusText', 'BILINMIYOR');
+  
+  // İrsaliye tip ve profil bilgileri
+  Profile := DespatchObj.GetValue<string>('profile', 'N/A');
+  DespatchType := DespatchObj.GetValue<string>('despatchType', 'N/A');
+  
+  // Elektronik belge bilgileri
+  ETTN := DespatchObj.GetValue<string>('ettn', 'N/A');
+  
+  // Lojistik bilgiler
+  CarrierName := DespatchObj.GetValue<string>('carrierName', 'N/A');
+  
+  // Sayısal bilgiler - güvenli parsing
+  try
+    TotalLineCount := StrToIntDef(DespatchObj.GetValue<string>('totalLineCount', '0'), 0);
+  except
+    TotalLineCount := 0;
+  end;
+  
+  try
+    TotalQuantity := StrToFloatDef(DespatchObj.GetValue<string>('totalQuantity', '0'), 0);
+  except
+    TotalQuantity := 0;
+  end;
+  
+  // Verileri grid'e yazma
+  StringGrid1.Cells[0, Row] := ID;
+  StringGrid1.Cells[1, Row] := Copy(IrsaliyeNo, 1, 20);
+  StringGrid1.Cells[2, Row] := Tarih;
+  StringGrid1.Cells[3, Row] := VknTckn;
+  StringGrid1.Cells[4, Row] := Copy(Unvan, 1, 25);
+  StringGrid1.Cells[5, Row] := Copy(Durum, 1, 15);
+  StringGrid1.Cells[6, Row] := Copy(Profile, 1, 10);
+  StringGrid1.Cells[7, Row] := Copy(DespatchType, 1, 10);
+  StringGrid1.Cells[8, Row] := Copy(ETTN, 1, 15) + '...';
+  StringGrid1.Cells[9, Row] := IntToStr(TotalLineCount);
+  StringGrid1.Cells[10, Row] := FormatFloat('#,##0.000', TotalQuantity);
+  StringGrid1.Cells[11, Row] := Copy(CarrierName, 1, 15);
+end;
+
+procedure TForm1.ClearDespatchGrid;
+var
+  i: Integer;
+begin
+  // Grid'i temizle (header hariç)
+  StringGrid1.RowCount := 2; // Header + 1 boş satır (minimum gereksinim)
+  StringGrid1.FixedRows := 1;
+  
+  // Boş satırı temizle
+  for i := 0 to StringGrid1.ColCount - 1 do
+    StringGrid1.Cells[i, 1] := '';
 end;
 
 end.

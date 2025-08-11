@@ -1,6 +1,6 @@
 # 🏢 EFaturaDelphi - MySoft API Entegrasyon Projesi
 
-[![Version](https://img.shields.io/badge/Version-v1.0.0-brightgreen.svg)](https://github.com/mukerremmert/MySoftDelphi/releases/tag/v1.0.0)
+[![Version](https://img.shields.io/badge/Version-v1.1.0-brightgreen.svg)](https://github.com/mukerremmert/MySoftDelphi/releases/tag/v1.1.0)
 [![Delphi](https://img.shields.io/badge/Delphi-10.3%20Rio+-red.svg)](https://www.embarcadero.com/products/delphi)
 [![Platform](https://img.shields.io/badge/Platform-Windows-blue.svg)](https://www.microsoft.com/windows)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
@@ -24,15 +24,18 @@
 ### ✅ **Mevcut Özellikler**
 - 🔐 **MySoft API Token Yönetimi** (Otomatik yenileme)
 - 📊 **Gelen Fatura Listesi Sorgulama** (18 sütunlu detaylı görünüm)
+- 📦 **Gelen İrsaliye Listesi Sorgulama** (12 sütunlu detaylı görünüm)
 - ⚙️ **Firma Ayarları Yönetimi** (VKN/TCKN doğrulama)
 - 🔒 **Güvenli API İletişimi** (HTTPS + JSON)
 - 📅 **Tarih Aralığı Filtreleme**
 - 💾 **Ayar Kaydetme/Yükleme** (INI dosyası)
 - 🌍 **Türkçe Karakter Desteği**
+- 🛠️ **Modüler Mimari** (Ayrı API sınıfları)
 
 ### 🔄 **Planlanacak Özellikler**
 - 📤 **Giden Fatura Gönderimi**
-- 📥 **Fatura Detay Görüntüleme**
+- 🚚 **Giden İrsaliye Gönderimi**
+- 📥 **Fatura/İrsaliye Detay Görüntüleme**
 - 🖨️ **PDF İndirme ve Yazdırma**
 - 📧 **E-posta Entegrasyonu**
 - 🗄️ **Veritabanı Entegrasyonu** (MySQL, MSSQL, PostgreSQL)
@@ -45,25 +48,40 @@
 ### 📁 **Proje Yapısı**
 ```
 EFaturaDelphi/
-├── 📄 EFaturaDelphi.dpr          # Ana proje dosyası
-├── 🖼️ MainForm.pas/dfm           # Ana form (Gelen faturalar)
-├── ⚙️ FirmaAyarlariForm.pas/dfm   # Firma ayarları formu
-├── 🔧 SettingsManager.pas         # Ayar yönetimi sınıfı
-├── 🌐 MySoftAPI.pas               # MySoft API wrapper sınıfı
+├── 📄 EFaturaDelphi.dpr              # Ana proje dosyası
+├── 🖼️ MainForm.pas/dfm               # Ana form (Gelen faturalar/irsaliyeler)
+├── ⚙️ FirmaAyarlariForm.pas/dfm       # Firma ayarları formu
+├── 🔧 EntegratorAyarlariForm.pas/dfm  # Entegratör ayarları formu
+├── 💾 SettingsManager.pas             # Ayar yönetimi sınıfı
+├── 🏗️ MySoftAPIBase.pas              # Base API sınıfı
+├── 📊 MySoftGelenFaturaAPI.pas       # Gelen fatura API sınıfı
+├── 📦 MySoftGelenIrsaliyeAPI.pas     # Gelen irsaliye API sınıfı
+├── 🔧 MySoftAPITypes.pas             # API tipleri ve sabitler
 └── 📚 Mysoft Entegrasyon Dokumanlari/
-    ├── 🔑 Token Olusturma.md      # Token API dokümantasyonu
-    └── 📋 Gelen Fatura Listesi.md # Fatura listesi API dokümantasyonu
+    ├── 🔑 Token Olusturma.md         # Token API dokümantasyonu
+    ├── 📋 Gelen Fatura Listesi.md    # Fatura listesi API dokümantasyonu
+    ├── 📦 Gelen Irsaliye Listesi.md  # İrsaliye listesi API dokümantasyonu
+    └── 🏢 ERP Entegrasyon Rehberi.md # ERP entegrasyon rehberi
 ```
 
 ### 🧩 **Sınıf Diyagramı**
 ```
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   TMainForm     │────│  TMySoftAPI      │────│ TSettingsManager│
+│   TMainForm     │────│  TMySoftAPIBase  │────│ TSettingsManager│
 │                 │    │                  │    │                 │
 │ - StringGrid1   │    │ + GetToken()     │    │ + LoadSettings()│
-│ - DateTimePicker│    │ + GetInvoices()  │    │ + SaveSettings()│
-│ + LoadInvoices()│    │ - CreateClient() │    │ + ValidateVKN() │
-└─────────────────┘    └──────────────────┘    └─────────────────┘
+│ - DateTimePicker│    │ + CreateClient() │    │ + SaveSettings()│
+│ + LoadInvoices()│    │ - HandleResponse()│    │ + ValidateVKN() │
+│ + LoadDespatches│    └──────────────────┘    └─────────────────┘
+└─────────────────┘             │
+                                 ├──────────────────────────┐
+                                 │                          │
+              ┌──────────────────▼──┐        ┌──────────────▼──────┐
+              │TMySoftGelenFaturaAPI│        │TMySoftGelenIrsaliyeAPI│
+              │                     │        │                       │
+              │+ GetInvoiceList()   │        │+ GetDespatchList()    │
+              │+ GetInvoiceDetail() │        │+ GetDespatchDetail()  │
+              └─────────────────────┘        └───────────────────────┘
 ```
 
 ### 🔗 **API Entegrasyon Akışı**
@@ -285,15 +303,35 @@ Content-Type: application/json
 
 #### **2. Gelen Fatura Listesi**
 ```http
-POST https://edocumentapi.mytest.tr/api/EInvoice/GetInboxInvoiceList
+POST https://edocumentapi.mytest.tr/api/invoiceinbox/getinvoiceinboxwithheaderinfolistforperiod
 Authorization: Bearer [TOKEN]
 Content-Type: application/json
 
 {
   "startDate": "2025-01-01",
   "endDate": "2025-01-31",
-  "pageSize": 100,
-  "pageNumber": 1
+  "limit": 100,
+  "pkAlias": "",
+  "sessionStatus": "",
+  "tenantIdentifierNumber": "",
+  "afterValue": ""
+}
+```
+
+#### **3. Gelen İrsaliye Listesi**
+```http
+POST https://edocumentapi.mytest.tr/api/despatchinbox/getdespatchinboxwithheaderinfolistforperiod
+Authorization: Bearer [TOKEN]
+Content-Type: application/json
+
+{
+  "startDate": "2025-01-01",
+  "endDate": "2025-01-31",
+  "limit": 100,
+  "pkAlias": "",
+  "sessionStatus": "",
+  "tenantIdentifierNumber": "",
+  "afterValue": ""
 }
 ```
 
@@ -390,7 +428,17 @@ Bu proje işinize yaradıysa, lütfen **⭐ yıldız** vererek destekleyin!
 
 ## 🏷️ **Sürüm Geçmişi**
 
-### 📋 **v1.0.0** (2025-01-11)
+### 📦 **v1.1.0** (2025-01-12) - İrsaliye API Desteği
+- ✅ **Gelen İrsaliye API** entegrasyonu
+- ✅ **Modüler mimari** (Base API sınıfı)
+- ✅ **12 sütunlu irsaliye görünümü** (ID, İrsaliye No, Tarih, VKN/TCKN, Ünvan, Durum, Profil, Tip, ETTN, Kalem Say., Toplam Miktar, Taşıyıcı)
+- ✅ **Güvenli JSON parsing** (TryGetValue kullanımı)
+- ✅ **Gelişmiş hata yakalama** (Debug bilgileri)
+- ✅ **Endpoint düzeltmeleri** (HTTP 405 hatası çözüldü)
+- ✅ **StringGrid optimizasyonu** (Fixed row count hatası çözüldü)
+- ✅ **Detaylı dokümantasyon** güncellemeleri
+
+### 📋 **v1.0.0** (2025-01-11) - İlk Sürüm
 - ✅ MySoft API Token yönetimi
 - ✅ Gelen fatura listesi sorgulama
 - ✅ 18 sütunlu detaylı fatura görünümü
@@ -400,9 +448,10 @@ Bu proje işinize yaradıysa, lütfen **⭐ yıldız** vererek destekleyin!
 - ✅ Türkçe karakter desteği
 
 ### 🔮 **Gelecek Sürümler**
-- 🔄 **v1.1.0**: Giden fatura gönderimi
-- 🔄 **v1.2.0**: PDF indirme ve yazdırma
-- 🔄 **v1.3.0**: Veritabanı entegrasyonu
+- 🔄 **v1.2.0**: Giden fatura gönderimi
+- 🔄 **v1.3.0**: Giden irsaliye gönderimi
+- 🔄 **v1.4.0**: PDF indirme ve yazdırma
+- 🔄 **v1.5.0**: Veritabanı entegrasyonu
 - 🔄 **v2.0.0**: Multi-provider desteği (Foriba, Kolaysoft, ICE)
 
 ---

@@ -9,7 +9,8 @@ uses
   SettingsHelper in 'SettingsHelper.pas',
   MySoftAPITypes in 'MySoftAPITypes.pas',
   MySoftAPIBase in 'MySoftAPIBase.pas',
-  MySoftGelenFaturaAPI in 'MySoftGelenFaturaAPI.pas';
+  MySoftGelenFaturaAPI in 'MySoftGelenFaturaAPI.pas',
+  MySoftGelenIrsaliyeAPI in 'MySoftGelenIrsaliyeAPI.pas';
 
 {$R *.res}
 

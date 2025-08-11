@@ -4,7 +4,8 @@ interface
 
 uses
   System.SysUtils, System.Classes, System.JSON, System.Net.HttpClient,
-  System.Net.URLClient, System.DateUtils, MySoftAPIBase, MySoftAPITypes;
+  System.Net.URLClient, System.DateUtils, System.Generics.Collections,
+  MySoftAPIBase, MySoftAPITypes;
 
 type
   { MySoft Gelen Fatura API - Specialized class }
@@ -77,7 +78,6 @@ end;
 function TMySoftGelenFaturaAPI.GetInvoiceDetail(const Token, InvoiceID: string): string;
 var
   HTTPClient: THTTPClient;
-  Response: IHTTPResponse;
   RequestBody: string;
   Headers: TNetHeaders;
   JSONObj: TJSONObject;
